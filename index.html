@@ -477,7 +477,7 @@
 </div>
 
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwngfu2ILwB7GIVYiMKfrPB411nmJtFTAjTCtEVGWREhHj7PJfmeNWotGUjoGBz1X4SZA/exec';
+const FORM_URL = 'https://docs.google.com/forms/d/e/1jmkFqwxAQM7iCg0-BktASxMKdHK3MfD6FokyzIBsvPs/formResponse';
 
 const quotes = [
   {
@@ -618,12 +618,10 @@ function getCheckedTasks(cardId) {
   return results;
 }
 
-async function handleSubmit() {
+function handleSubmit() {
   const btn = document.getElementById('submitBtn');
-  const errorMsg = document.getElementById('errorMsg');
   btn.disabled = true;
   btn.textContent = 'Submitting...';
-  errorMsg.style.display = 'none';
 
   const wakeTime = document.getElementById('wakeTime').value;
   const academicsTasks = getCheckedTasks('academicsCard');
@@ -634,34 +632,52 @@ async function handleSubmit() {
   const homeChecked = homeTasks.filter(t => t.checked).map(t => t.label);
   const homeUnchecked = homeTasks.filter(t => !t.checked).map(t => t.label);
 
-  const payload = {
-    date: today.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }),
-    wakeTime: wakeTime,
-    academicsCompleted: academicsChecked.join(' | '),
-    academicsMissed: academicsUnchecked.join(' | '),
-    cleaningTask: todayTask.task,
-    homeCompleted: homeChecked.join(' | '),
-    homeMissed: homeUnchecked.join(' | '),
-    academicsScore: `${academicsChecked.length} of ${academicsTasks.length}`,
-    homeScore: `${homeChecked.length} of ${homeTasks.length}`
-  };
+  const dateStr = today.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  const academicsScore = `${academicsChecked.length} of ${academicsTasks.length}`;
+  const homeScore = `${homeChecked.length} of ${homeTasks.length}`;
 
-  try {
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+  const params = new URLSearchParams({
+    'entry.1779992754': dateStr,
+    'entry.63034144': wakeTime,
+    'entry.1300418138': academicsScore,
+    'entry.540885701': academicsChecked.join(' | '),
+    'entry.1420206966': academicsUnchecked.join(' | '),
+    'entry.419344264': homeScore,
+    'entry.2060837990': homeChecked.join(' | '),
+    'entry.187375895': homeUnchecked.join(' | '),
+    'entry.1645035184': todayTask.task
+  });
 
+  const iframe = document.createElement('iframe');
+  iframe.name = 'hidden_iframe';
+  iframe.style.display = 'none';
+  document.body.appendChild(iframe);
+
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = FORM_URL;
+  form.target = 'hidden_iframe';
+  form.style.display = 'none';
+
+  for (const [key, value] of params.entries()) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = key;
+    input.value = value;
+    form.appendChild(input);
+  }
+
+  document.body.appendChild(form);
+
+  iframe.onload = function() {
     const stored = JSON.parse(localStorage.getItem('streakData') || '{}');
     stored[today.toDateString()] = true;
     localStorage.setItem('streakData', JSON.stringify(stored));
 
     const summaryLines = [
       `Wake time: ${wakeTime}`,
-      `Academics: ${payload.academicsScore}`,
-      `Home & hygiene: ${payload.homeScore}`,
+      `Academics: ${academicsScore}`,
+      `Home & hygiene: ${homeScore}`,
       `Cleaning task: ${todayTask.task}`
     ];
 
@@ -671,12 +687,9 @@ async function handleSubmit() {
 
     document.getElementById('mainContent').style.display = 'none';
     document.getElementById('successScreen').style.display = 'block';
+  };
 
-  } catch(e) {
-    btn.disabled = false;
-    btn.textContent = 'Submit today\'s check-in';
-    errorMsg.style.display = 'block';
-  }
+  form.submit();
 }
 </script>
 </body>
